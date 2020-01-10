@@ -1,4 +1,4 @@
-# DNN-for-MNIST
+# DNN
 ### Deep (Vanilla) Neural Network for classifying hand-written digits, written in C++
 This program classifies the MNIST hand-written digit dataset, with 60000 training samples and 10000 testing samples, all in 28x28 grayscale resolution. This is a classic problem, and there have been numerous methods published for it: http://yann.lecun.com/exdb/mnist/. One of the pioneers of MNIST, Yann LeCun, is renowned in the field of machine learning. The whole network is hard-coded, only using libraries for basic tools such as square root, exponential functions, and std::vector. 
 ### Details & Parameters
