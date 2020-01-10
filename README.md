@@ -12,4 +12,5 @@ You must run the program in the same direcoty as all of the data files. You can 
 
 ### Results
 1/10/20: ~27%. This is quite high, but the structure is non-optimal: 784-35-35-10, logistic activation, SGD, and linear learning schedule.<br/>
-1/10/20: 19.28%. Same structure as above, but fixing memory leaks allows using **all** 60000 training samples.
+1/10/20: 19.28%. Same structure as above, but fixing memory leaks allows using **all** 60000 training samples. <br/>
+1/10/20: 14.65%. 784-40-20-10 instead. Slower, but still fast at just over a minute. Interestingly, same total quantity of nodes, but one layer is bigger than the other.
