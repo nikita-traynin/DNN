@@ -8,4 +8,4 @@ One of the most pivotal parameters is the learning rate. I'm using a changing le
 
 Another parameter is the batch size. Currently it's set at 1 for stochastic gradient descent. Also, using more than 15000 of the training sample leads to some memory allocation issues, and as soon as I sort that out I will mess with mini-batch gradient descent. 
 ### Results
-As of 1/10/20, the lowest testing error rate is ~27%. This is quite high, but the structure is: 784-50-50-10, logistic activation, SGD, and linear learning schedule.
+As of 1/10/20, the lowest testing error rate is ~27%. This is quite high, but the structure is non-optimal: 784-50-50-10, logistic activation, SGD, and linear learning schedule.
