@@ -14,10 +14,10 @@
 using namespace std;
 
 //hyperparameters
-const int kLayerCount = 4;					//>=3 (one for input, one for decision, and at least one hidden)					
-const int kNodeCount = 35;					//>=1 			
-const int kIterationCount = 14000;			//number of iterations we do (TODO: for now, this is how many of the training images we use)
-const int kInitialWeightMax = 2;		//max magnitude of initial random weights times 100
+const int kLayerCount = 4;						//>=3 (one for input, one for decision, and at least one hidden)					
+const int kNodeCount[kLayerCount-2] {50,20};	//>=1 			
+const int kBatchSize = 1;						//TODO: currently must be 1! Change so that different batchsizes are possible.
+const int kInitialWeightMax = 2;				//max magnitude of initial random weights times 100
 
 //TODO temporary variables for input-data related info. Remove when we can read this from input file (idx1/idx3)
 const int kResolution = 28; 									
@@ -28,6 +28,7 @@ const int kTestingImageCount = 10000;
 int main() {
 	//set random seed
 	srand(time(NULL));
+	
 	//pixels/training_labels dynamic due to large array size
 	unsigned char* training_pixels = new unsigned char[kTrainingImageCount*kInputCount];  
 	unsigned char* training_labels = new unsigned char[kTrainingImageCount];
@@ -87,7 +88,7 @@ int main() {
 	int num_nodes[kLayerCount];
 	num_nodes[0] = kInputCount;
 	for(int i = 1; i < kLayerCount-1; i++) {
-		num_nodes[i] = kNodeCount;
+		num_nodes[i] = kNodeCount[i-1];
 	}
 	num_nodes[kLayerCount-1] = 10;					
 	Layer layers[kLayerCount];
@@ -109,10 +110,15 @@ int main() {
 	}
 	
 	
-	//Start gradient descent (stochastic)
+	//Initialize variables and arrays for training
 	int num_training_errors = 0;
+	float **activation_gradient = new float*[kLayerCount];
+	activation_gradient[kLayerCount-1] = new float[num_nodes[kLayerCount-1]];
+	float ***weight_gradient = new float**[kLayerCount-1];					//FROM the ith layer
+	float **bias_gradient = new float*[kLayerCount-1];
 	
-	for(int iter = 0; iter < kIterationCount; iter++) {
+	//TRAINING LOOP (slow)//
+	for(int iter = 0; iter < kTrainingImageCount/kBatchSize; iter++) {
 		float learning_rate = Schedule(iter+1);
 		float mean = Mean(training_pixels, iter*num_nodes[0], num_nodes[0]);
 		float variance = Variance(training_pixels, iter*num_nodes[0], num_nodes[0], mean);
@@ -146,12 +152,6 @@ int main() {
 		if(max_index != training_labels[iter])
 			num_training_errors++;
 		
-		float **activation_gradient = new float*[kLayerCount];
-		activation_gradient[kLayerCount-1] = new float[num_nodes[kLayerCount-1]];
-		float ***weight_gradient = new float**[kLayerCount-1];					//FROM the ith layer
-		float **bias_gradient = new float*[kLayerCount-1];
-		
-		
 		
 		//Calculate cost and final layer gradient
 		float cost = 0;
@@ -168,7 +168,7 @@ int main() {
 			cost += diff*diff;
 		}
 		
-		//Backpropagate to find activation gradient for all other layers
+		//Backpropagate to find gradients for all other layers
 		for(int i = kLayerCount-2; i >= 0; i--) {
 			activation_gradient[i] = new float[num_nodes[i]];
 			weight_gradient[i] = new float*[num_nodes[i]];
@@ -177,15 +177,17 @@ int main() {
 				weight_gradient[i][j] = new float[num_nodes[i+1]];
 				float sum = 0;
 				for(int k = 0; k < num_nodes[i+1]; k++) {
-					weight_gradient[i][j][k] = layers[i].a_[j]*LogisticPrime(layers[i+1].a_[k])*activation_gradient[i+1][k];
+					float factor = LogisticPrime(layers[i+1].a_[k]);
+					weight_gradient[i][j][k] = layers[i].a_[j]*factor*activation_gradient[i+1][k];
 					if(i != 0)
-						sum += layers[i+1].w_[j][k]*LogisticPrime(layers[i+1].a_[k])*activation_gradient[i+1][k];
+						sum += layers[i+1].w_[j][k]*factor*activation_gradient[i+1][k];
 				}
 				activation_gradient[i][j] = sum;
 			}
 			for(int j = 0; j < num_nodes[i+1]; j++) {
 				bias_gradient[i][j] = LogisticPrime(layers[i+1].a_[j])*activation_gradient[i+1][j];
 			}
+			delete [] activation_gradient[i];
 		}
 		
 		//Adjust weights and biases
@@ -195,37 +197,25 @@ int main() {
 					for(int k = 0; k < num_nodes[i+1]; k++) {
 						layers[i+1].w_[j][k] -= learning_rate*weight_gradient[i][j][k];
 					}
+					delete [] weight_gradient[i][j];
 				}
 				if(i != 0) {
 					layers[i].b_[j] -= learning_rate*bias_gradient[i-1][j];
 				}
 			}
+			delete [] weight_gradient[i];
+			if(i != 0)
+				delete [] bias_gradient[i-1];
 		}
 		
-		//Gradients with respect to weights 
-		// for(int i = 0; i < kLayerCount-1; i++) {
-			// weight_gradient[i] = new float*[num_nodes[i]];
-			// bias_gradient[i+1] = new float[num_nodes[i+1]];
-			// for(int j = 0; j < num_nodes[i]; j++) { 
-				// weight_gradient[i][j] = new float[num_nodes[i+1]];
-				// for(int k = 0; k < num_nodes[i+1]; k++) {
-					// weight_gradient[i][j][k] = layers[i].a_[j]*LogisticPrime(layers[i+1].a_[k])*activation_gradient[i+1][k];		//d(Cost)/d(destination node)*d(destination node)/d(sum)*d(sum)/d(weight)
-					// layers[i+1].w_[j][k] -= learning_rate*weight_gradient[i][j][k];														//adjust weights 
-				// }
-			// }
-			// for(int j = 0; j < num_nodes[i+1]; j++) {
-				// bias_gradient[i+1][j] = LogisticPrime(layers[i+1].a_[j])*activation_gradient[i+1][j];
-				// layers[i+1].b_[j] -= learning_rate*bias_gradient[i+1][j];
-			// }
-		// }
+		//TODO: temporary, only for SGD, checking every 500 iterations various variables.
 		if(iter%500 == 0) {
 			cout << "\nImage " << iter+1;
 			cout << ". Cost: " << cost << ". Learning rate: " << learning_rate << ". So far error: " << float(num_training_errors)/float(iter+1)*100.0 << "%. So far missed: " << num_training_errors;
 		}
-		
 	}
 	
-	//TESTING//
+	//TESTING LOOP//
 	int num_testing_errors = 0;
 	for(int iter = 0; iter < kTestingImageCount; iter++) {
 		float mean = Mean(testing_pixels, iter*num_nodes[0], num_nodes[0]);
@@ -243,7 +233,7 @@ int main() {
 				for(int k = 0; k < num_nodes[i-1]; k++) {
 					sum += layers[i-1].a_[k] * layers[i].w_[k][j];
 				}
-				sum += layers[i].b_[j];						//TODO: add in biases! (none as of now)
+				sum += layers[i].b_[j];				
 				layers[i].a_[j] = Logistic(sum);			
 			}
 		}
@@ -263,7 +253,6 @@ int main() {
 				cout << "\nMissed guess on " << iter+1 << ": " << max_index << ". Actual: " << (int)testing_labels[iter] << ". Highest activation: " << max;
 		}
 	}
-	
 	cout << "\nThe testing error is: " << (float(num_testing_errors)/kTestingImageCount)*100 << "%.\n";
 	cout << "\nThe end!\n";
 }
