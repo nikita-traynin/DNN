@@ -11,4 +11,5 @@ Another parameter is the batch size. Currently it's set at 1 for stochastic grad
 You must run the program in the same direcoty as all of the data files. You can find them on the MNIST website in zipped form as well.
 
 ### Results
-As of 1/10/20, the lowest testing error rate is ~27%. This is quite high, but the structure is non-optimal: 784-50-50-10, logistic activation, SGD, and linear learning schedule.
+1/10/20: ~27%. This is quite high, but the structure is non-optimal: 784-50-50-10, logistic activation, SGD, and linear learning schedule.
+1/10/20: 19.28%. Same structure as above, but fixing memory leaks allows using [u]all[/u] 60000 training samples.
