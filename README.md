@@ -7,5 +7,8 @@ My program is a vanilla neural network, with an arbitrary number of hidden layer
 One of the most pivotal parameters is the learning rate. I'm using a changing learning rate (a schedule) for better results. So far I've tried using a constant rate, exponentially decaying rate, and linearly decaying rate. The linear method works the best: it starts at a high rate and decreases linearly until a certain lower bound; the initial value, decay slope, and lower bound are all controlled with constants in the code.
 
 Another parameter is the batch size. Currently it's set at 1 for stochastic gradient descent. Also, using more than 15000 of the training sample leads to some memory allocation issues, and as soon as I sort that out I will mess with mini-batch gradient descent. 
+
+You must run the program in the same direcoty as all of the data files. You can find them on the MNIST website in zipped form as well.
+
 ### Results
 As of 1/10/20, the lowest testing error rate is ~27%. This is quite high, but the structure is non-optimal: 784-50-50-10, logistic activation, SGD, and linear learning schedule.
