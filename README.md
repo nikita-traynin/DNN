@@ -15,5 +15,6 @@ You must run the program in the same direcoty as all of the data files. You can 
 1/10/20: 19.28%. Same structure as above, but fixing memory leaks allows using **all** 60000 training samples. <br/>
 1/10/20: 14.65%. 784-50-20-10, all else same as above. Slower, but still fast at just over a minute. <br/>
 1/10/20: 13.64%. Same as above. <br/>
-1/10/20 Notes: Current method seems to have large variance. Testing errors have bounced from 14.65, to 25.56, back to 13.65. From now on, 0-initializing biases.
-1/11/20: 9.49%. 784-50-10, all else same as above.
+1/10/20 Notes: Current method seems to have large variance. Testing errors have bounced from 14.65, to 25.56, back to 13.65. From now on, 0-initializing biases. <br/>
+1/11/20: 9.49%. 784-50-10, all else same as above. <br/>
+1/11/20: 8.51%. Same as above. Also, turned on -O3 optimization flag in g++ for significant speed up.
