@@ -8,16 +8,18 @@
 #include <iomanip>
 #include <cmath>
 #include <ctime>
+#include <vector>
 #include "logistic.h"						//includes cmath
 #include "layer.h"							//includes vector
 
 using namespace std;
 
 //hyperparameters
-const int kLayerCount = 4;						//>=3 (one for input, one for decision, and at least one hidden)					
-const int kNodeCount[kLayerCount-2] {50,20};	//>=1 			
+const int kLayerCount = 3;						//>=3 (one for input, one for decision, and at least one hidden)					
+const int kNodeCount[kLayerCount-2] {50};	//>=1 			
 const int kBatchSize = 1;						//TODO: currently must be 1! Change so that different batchsizes are possible.
-const int kInitialWeightMax = 2;				//max magnitude of initial random weights times 100
+const float kInitialWeightMax = 1;				//max magnitude of initial random weight
+const int kHighErrorCount = 10;					//how many most difficult test images to show
 
 //TODO temporary variables for input-data related info. Remove when we can read this from input file (idx1/idx3)
 const int kResolution = 28; 									
@@ -98,12 +100,12 @@ int main() {
 	for(int i = 1; i < kLayerCount; i++) {
 		layers[i].a_.assign(num_nodes[i],0);
 		for(int k = 0; k < num_nodes[i]; k++) {
-			layers[i].b_.push_back(RandomWeight(100));
+			layers[i].b_.push_back(0);
 		}
 		for(int j = 0; j < num_nodes[i-1]; j++) {
 			vector<float> temp;
 			for(int k = 0; k < num_nodes[i]; k++) {
-				temp.push_back(RandomWeight(kInitialWeightMax*100));
+				temp.push_back(RandomWeight(int(kInitialWeightMax*100.0)));
 			}
 			layers[i].w_.push_back(temp);								//TO the ith layer
 		}
@@ -209,7 +211,7 @@ int main() {
 		}
 		
 		//TODO: temporary, only for SGD, checking every 500 iterations various variables.
-		if(iter%500 == 0) {
+		if(iter%1000 == 0) {
 			cout << "\nImage " << iter+1;
 			cout << ". Cost: " << cost << ". Learning rate: " << learning_rate << ". So far error: " << float(num_training_errors)/float(iter+1)*100.0 << "%. So far missed: " << num_training_errors;
 		}
@@ -217,6 +219,9 @@ int main() {
 	
 	//TESTING LOOP//
 	int num_testing_errors = 0;
+	float cost = 0;
+	float min_max_cost = 0;
+	vector<float> high_error_stats;
 	for(int iter = 0; iter < kTestingImageCount; iter++) {
 		float mean = Mean(testing_pixels, iter*num_nodes[0], num_nodes[0]);
 		float variance = Variance(testing_pixels, iter*num_nodes[0], num_nodes[0], mean);
@@ -239,19 +244,48 @@ int main() {
 		}
 		
 		//Find which number the networks reads input as
-		float max = 0;
-		int max_index = -1;
+		float max = -1;
+		int max_index = -1;											//Max index is the digit the network predicted (max because it's the maximum activation)
+		cost = 0;
+		float activation = -1;
 		for(int i = 0; i < num_nodes[kLayerCount-1]; i++) {
-			if(layers[kLayerCount-1].a_[i] > max)
-				{ max_index = i; max = layers[kLayerCount-1].a_[i]; }
+			activation = layers[kLayerCount-1].a_[i];
+			if(i == (int)testing_labels[iter]) {
+				cost += (activation-1)*(activation-1);
+			}
+			else {
+				cost += activation*activation;
+			}
+			if(activation > max)
+				{ max_index = i; max = activation; }
 		}
 
 		//If it's the wrong number, indicate an error
 		if(max_index != (int)testing_labels[iter]) {
 			num_testing_errors++;
-			if(num_testing_errors < 25)
-				cout << "\nMissed guess on " << iter+1 << ": " << max_index << ". Actual: " << (int)testing_labels[iter] << ". Highest activation: " << max;
+			if(num_testing_errors <= kHighErrorCount) {
+				high_error_stats.push_back(float(testing_labels[iter]));
+				high_error_stats.push_back(float(max_index));
+				high_error_stats.push_back(cost);
+				high_error_stats.push_back(max);
+				high_error_stats.push_back(float(iter+1));
+				min_max_cost = high_error_stats[MinimumCostIndex(high_error_stats)];
+				
+			}
+			else if (cost > min_max_cost) {
+				float index = MinimumCostIndex(high_error_stats);
+				high_error_stats[index-2] = float(testing_labels[iter]);
+				high_error_stats[index-1] = float(max_index);
+				high_error_stats[index] = cost;
+				high_error_stats[index+1] = max;
+				high_error_stats[index+2] = float(iter+1);
+				min_max_cost = high_error_stats[index];
+			}
 		}
+	}
+	cout << "\n" << kHighErrorCount << " most difficult digits: ";
+	for(int i = 0; i < kHighErrorCount; i++) {
+		cout << "\nAt image " << high_error_stats[i*5+4] << ": Actual " << high_error_stats[i*5] << ", Predicted " << high_error_stats[i*5+1] << ", Cost " << high_error_stats[i*5+2] << ", Max Activation " << high_error_stats[i*5+3];
 	}
 	cout << "\nThe testing error is: " << (float(num_testing_errors)/kTestingImageCount)*100 << "%.\n";
 	cout << "\nThe end!\n";
