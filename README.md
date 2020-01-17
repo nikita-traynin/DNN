@@ -19,4 +19,4 @@ Note: Current method seems to have large variance. Testing errors have bounced f
 1/11/20: 9.49%. 784-50-10, all else same as above. <br/>
 1/11/20: 8.51%. Same as above. Also, turned on -O3 optimization flag in g++ for significant speed up. <br/>
 1/16/20: 4.87%. 784-50-10. Now repeating for 7 epochs, instead of 1. This stabilizes and lowers the testing rate. <br/>
-Note: Also mentioned in LeCun's 1998 paper is that overfitting doesn't seem to occur. This is due to this model's stochastic nature; the testing error instead levels out at a minimum.
+Note: The testing error does not rise after reaching a minimum in this model, even after training error no longer represents testing performance. So, overfitting is not an issue, surprisingly. LeCun explains how this is due to the stochastic descent tactic. 
