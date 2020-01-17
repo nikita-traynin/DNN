@@ -1,4 +1,7 @@
 #include <cmath>
+#include <vector>
+
+using namespace std;
 
 float Logistic(float x) {
 	float k = 1/1.5;
@@ -28,9 +31,9 @@ float ExponentialSchedule(int x) {
 }
 
 float LinearSchedule(int x) {
-	float initial_rate = 1;
+	float initial_rate = 0.2;
 	int num_iterations = 500;
-	float lower_bound = 0.05;
+	float lower_bound = 0.01;
 	if(x > num_iterations)
 		return lower_bound;
 	else
@@ -64,3 +67,14 @@ float Variance(unsigned char *arr, int start, int size, float mean) {
 	return variance/size;
 }
 
+int MinimumCostIndex(vector<float> &vec) {
+	float minimum = 10;
+	int index = -1;
+	for(int i = 0; i < vec.size()/5; i++) {
+		if (vec[i*5+2] < minimum) {
+			index = i*5+2;
+			minimum = vec[index];
+		}
+	}
+	return index;
+}
