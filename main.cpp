@@ -1,25 +1,27 @@
 //Welcome to my neural networks program! (new version, NOT DONE)
-//This is about setting up and training a network to predict grayscale hand-written digits
+//This is about setting up and training a network to predict hand-written digits
 //We start with a resolution of 28-by-28, using the MNIST database. http://yann.lecun.com/exdb/mnist/
-//
 //By: Nikita Traynin
-#include <iostream>
-#include <fstream>
-#include <iomanip>
-#include <cmath>
-#include <ctime>
-#include <vector>
-#include "logistic.h"						//includes cmath
-#include "layer.h"							//includes vector
+
+#include <iostream>		//cout 
+#include <fstream>		//ifstream
+#include <iomanip>		//setw	
+#include <cmath>		//sqrt
+#include <ctime>		//time(NULL) (for rand)
+#include <vector>		//for vectors
+#include "logistic.h"						
+#include "layer.h"							
+#include "read.h"	
 
 using namespace std;
 
 //hyperparameters
 const int kLayerCount = 3;						//>=3 (one for input, one for decision, and at least one hidden)					
-const int kNodeCount[kLayerCount-2] {50};	//>=1 			
+const int kNodeCount[kLayerCount-2] {50};		//>=1 			
 const int kBatchSize = 1;						//TODO: currently must be 1! Change so that different batchsizes are possible.
-const float kInitialWeightMax = 1;				//max magnitude of initial random weight
+const float kInitialWeightMax = 2.4;			//max magnitude of initial random weight
 const int kHighErrorCount = 10;					//how many most difficult test images to show
+const int kEpochCount = 7;
 
 //TODO temporary variables for input-data related info. Remove when we can read this from input file (idx1/idx3)
 const int kResolution = 28; 									
@@ -38,37 +40,10 @@ int main() {
 	unsigned char* testing_labels = new unsigned char[kTestingImageCount];
 	int magic_num, num_img, num_row, num_col, num_items;									//variables to store data from the headers of NMIST files
 	
-	//Read header of training images file
-	ifstream training_images_file("train-images.idx3-ubyte", ios::binary);
-	if(!training_images_file.is_open())
-		{ cout << "\nCouldn't open training image file!\n"; return -1; }
-	training_images_file.read((char*)&magic_num, 4);
-	training_images_file.read((char*)&num_img, 4);
-	training_images_file.read((char*)&num_row, 4);
-	training_images_file.read((char*)&num_col, 4);
-	
-	//Read header of training images file
-	ifstream testing_images_file("t10k-images.idx3-ubyte", ios::binary);
-	if(!testing_images_file.is_open())
-		{ cout << "\nCouldn't open testing image file!\n"; return -1; }
-	testing_images_file.read((char*)&magic_num, 4);
-	testing_images_file.read((char*)&num_img, 4);
-	testing_images_file.read((char*)&num_row, 4);
-	testing_images_file.read((char*)&num_col, 4);
-	
-	//Read header of training training_labels file
-	ifstream training_labels_file("train-labels.idx1-ubyte", ios::binary);
-	if(!training_labels_file.is_open())
-		{ cout << "\nCouldn't open training label file!\n"; return -1; }
-	training_labels_file.read((char*)&magic_num, 4);
-	training_labels_file.read((char*)&num_items, 4);
-	
-	//Read header of training training_labels file
-	ifstream testing_labels_file("t10k-labels.idx1-ubyte", ios::binary);
-	if(!testing_labels_file.is_open())
-		{ cout << "\nCouldn't open testing label file!\n"; return -1; }
-	testing_labels_file.read((char*)&magic_num, 4);
-	testing_labels_file.read((char*)&num_items, 4);
+	ifstream training_images_file = readTrainingImgHeader(magic_num, num_img, num_row, num_col);
+	ifstream testing_images_file = readTestingImgHeader(magic_num, num_img, num_row, num_col);
+	ifstream training_labels_file = readTrainingLblHeader(magic_num, num_img);
+	ifstream testing_labels_file = readTestingLblHeader(magic_num, num_img);
 
 	//Read pixel/label training data (slow!)
 	for(int i = 0; i < kTrainingImageCount; i++) {
@@ -105,7 +80,7 @@ int main() {
 		for(int j = 0; j < num_nodes[i-1]; j++) {
 			vector<float> temp;
 			for(int k = 0; k < num_nodes[i]; k++) {
-				temp.push_back(RandomWeight(int(kInitialWeightMax*100.0)));
+				temp.push_back(RandomWeight(int(kInitialWeightMax*100.0))/float(num_nodes[i-1]));
 			}
 			layers[i].w_.push_back(temp);								//TO the ith layer
 		}
@@ -113,114 +88,139 @@ int main() {
 	
 	
 	//Initialize variables and arrays for training
-	int num_training_errors = 0;
 	float **activation_gradient = new float*[kLayerCount];
 	activation_gradient[kLayerCount-1] = new float[num_nodes[kLayerCount-1]];
 	float ***weight_gradient = new float**[kLayerCount-1];					//FROM the ith layer
 	float **bias_gradient = new float*[kLayerCount-1];
 	
 	//TRAINING LOOP (slow)//
-	for(int iter = 0; iter < kTrainingImageCount/kBatchSize; iter++) {
-		float learning_rate = Schedule(iter+1);
+	for(int epoch_iter = 0; epoch_iter < kEpochCount; epoch_iter++) {
+		for(int iter = 0; iter < kTrainingImageCount/kBatchSize; iter++) {
+			float learning_rate = Schedule(iter+1);
+			float mean = Mean(training_pixels, iter*num_nodes[0], num_nodes[0]);
+			float variance = Variance(training_pixels, iter*num_nodes[0], num_nodes[0], mean);
+			
+			//Plug in normalized (mean 0 variance 1) pixel values
+			for(int i = 0; i < num_nodes[0]; i++) {
+				layers[0].a_[i] = (1/sqrt(variance))*(training_pixels[iter*num_nodes[0] + i]-mean);				
+			}
+
+			//FEEDFORWARD//
+			for(int i = 1; i < kLayerCount; i++) {
+				for(int j = 0; j < num_nodes[i]; j++) {
+					float sum = 0;
+					for(int k = 0; k < num_nodes[i-1]; k++) {
+						sum += layers[i-1].a_[k] * layers[i].w_[k][j];
+					}
+					sum += layers[i].b_[j];						
+					layers[i].a_[j] = Logistic(sum);			
+				}
+			}
+			
+			//Calculate cost and final layer gradient
+			float cost = 0;
+			float diff;
+			for(int i = 0; i < num_nodes[kLayerCount-1]; i++) {
+				if(i == training_labels[iter]) {
+					activation_gradient[kLayerCount-1][i] = 2*(layers[kLayerCount-1].a_[i]-1);
+					diff = layers[kLayerCount-1].a_[i]-1;
+				}
+				else {
+					activation_gradient[kLayerCount-1][i] = 2*(layers[kLayerCount-1].a_[i]);
+					diff = layers[kLayerCount-1].a_[i];
+				}
+				cost += diff*diff;
+			}
+			
+			//Backpropagate to find gradients for all other layers
+			for(int i = kLayerCount-2; i >= 0; i--) {
+				activation_gradient[i] = new float[num_nodes[i]];
+				weight_gradient[i] = new float*[num_nodes[i]];
+				bias_gradient[i] = new float[num_nodes[i+1]];
+				for(int j = 0; j < num_nodes[i]; j++) {
+					weight_gradient[i][j] = new float[num_nodes[i+1]];
+					float sum = 0;
+					for(int k = 0; k < num_nodes[i+1]; k++) {
+						float factor = LogisticPrime(layers[i+1].a_[k]);
+						weight_gradient[i][j][k] = layers[i].a_[j]*factor*activation_gradient[i+1][k];
+						if(i != 0)
+							sum += layers[i+1].w_[j][k]*factor*activation_gradient[i+1][k];
+					}
+					activation_gradient[i][j] = sum;
+				}
+				for(int j = 0; j < num_nodes[i+1]; j++) {
+					bias_gradient[i][j] = LogisticPrime(layers[i+1].a_[j])*activation_gradient[i+1][j];
+				}
+				delete [] activation_gradient[i];
+			}
+			
+			//Adjust weights and biases
+			for(int i = 0; i < kLayerCount; i++) {
+				for(int j = 0; j < num_nodes[i]; j++) {
+					if(i != kLayerCount-1) {
+						for(int k = 0; k < num_nodes[i+1]; k++) {
+							layers[i+1].w_[j][k] -= learning_rate*weight_gradient[i][j][k];
+						}
+						delete [] weight_gradient[i][j];
+					}
+					if(i != 0) {
+						layers[i].b_[j] -= learning_rate*bias_gradient[i-1][j];
+					}
+				}
+				delete [] weight_gradient[i];
+				if(i != 0)
+					delete [] bias_gradient[i-1];
+			}
+			if(iter %15000 == 0) {
+				cout << "\n" << iter << " images complete. ";
+			}
+		}
+	}
+	
+	//GET TRAINING ERROR
+	int num_training_errors = 0, max_index = -1;
+	float cost = 0, max = -1, activation = -1, min_max_cost = 0;
+	for(int iter = 0; iter < kTrainingImageCount; iter++) {
 		float mean = Mean(training_pixels, iter*num_nodes[0], num_nodes[0]);
 		float variance = Variance(training_pixels, iter*num_nodes[0], num_nodes[0], mean);
 		
-		//Plug in normalized (mean 0 variance 1) pixel values
+		//Plug in normalized pixel values
 		for(int i = 0; i < num_nodes[0]; i++) {
-			layers[0].a_[i] = (1/sqrt(variance))*(training_pixels[iter*num_nodes[0] + i]-mean);				
+			if(variance == 0)
+				cout << "\t\t\t\tVARIANCE IS 0, so division by 0 occurs";
+			layers[0].a_[i] = (1/sqrt(variance))*(training_pixels[iter*num_nodes[0] + i]-mean);					//mean-0, variance-1
 		}
-
-		//FEEDFORWARD//
+		
+		//Feed into rest of network
 		for(int i = 1; i < kLayerCount; i++) {
 			for(int j = 0; j < num_nodes[i]; j++) {
 				float sum = 0;
 				for(int k = 0; k < num_nodes[i-1]; k++) {
 					sum += layers[i-1].a_[k] * layers[i].w_[k][j];
 				}
-				sum += layers[i].b_[j];						
+				sum += layers[i].b_[j];				
 				layers[i].a_[j] = Logistic(sum);			
 			}
 		}
 		
-		//Count the errors
-		int max_index = -1;
-		float max = -1;
+		//Count errors
+		max = -1;
+		max_index = -1;											//Max index is the digit the network predicted (max because it's the maximum activation)
 		for(int i = 0; i < num_nodes[kLayerCount-1]; i++) {
-			if(layers[kLayerCount-1].a_[i] > max) {
-				max_index = i; 
-				max = layers[kLayerCount-1].a_[i];
-			}
+			activation = layers[kLayerCount-1].a_[i];
+			if(activation > max)
+				{ max_index = i; max = activation; }
 		}
-		if(max_index != training_labels[iter])
+		if(max_index != training_labels[iter]) {
 			num_training_errors++;
-		
-		
-		//Calculate cost and final layer gradient
-		float cost = 0;
-		float diff;
-		for(int i = 0; i < num_nodes[kLayerCount-1]; i++) {
-			if(i == training_labels[iter]) {
-				activation_gradient[kLayerCount-1][i] = 2*(layers[kLayerCount-1].a_[i]-1);
-				diff = layers[kLayerCount-1].a_[i]-1;
-			}
-			else {
-				activation_gradient[kLayerCount-1][i] = 2*(layers[kLayerCount-1].a_[i]);
-				diff = layers[kLayerCount-1].a_[i];
-			}
-			cost += diff*diff;
-		}
-		
-		//Backpropagate to find gradients for all other layers
-		for(int i = kLayerCount-2; i >= 0; i--) {
-			activation_gradient[i] = new float[num_nodes[i]];
-			weight_gradient[i] = new float*[num_nodes[i]];
-			bias_gradient[i] = new float[num_nodes[i+1]];
-			for(int j = 0; j < num_nodes[i]; j++) {
-				weight_gradient[i][j] = new float[num_nodes[i+1]];
-				float sum = 0;
-				for(int k = 0; k < num_nodes[i+1]; k++) {
-					float factor = LogisticPrime(layers[i+1].a_[k]);
-					weight_gradient[i][j][k] = layers[i].a_[j]*factor*activation_gradient[i+1][k];
-					if(i != 0)
-						sum += layers[i+1].w_[j][k]*factor*activation_gradient[i+1][k];
-				}
-				activation_gradient[i][j] = sum;
-			}
-			for(int j = 0; j < num_nodes[i+1]; j++) {
-				bias_gradient[i][j] = LogisticPrime(layers[i+1].a_[j])*activation_gradient[i+1][j];
-			}
-			delete [] activation_gradient[i];
-		}
-		
-		//Adjust weights and biases
-		for(int i = 0; i < kLayerCount; i++) {
-			for(int j = 0; j < num_nodes[i]; j++) {
-				if(i != kLayerCount-1) {
-					for(int k = 0; k < num_nodes[i+1]; k++) {
-						layers[i+1].w_[j][k] -= learning_rate*weight_gradient[i][j][k];
-					}
-					delete [] weight_gradient[i][j];
-				}
-				if(i != 0) {
-					layers[i].b_[j] -= learning_rate*bias_gradient[i-1][j];
-				}
-			}
-			delete [] weight_gradient[i];
-			if(i != 0)
-				delete [] bias_gradient[i-1];
-		}
-		
-		//TODO: temporary, only for SGD, checking every 500 iterations various variables.
-		if(iter%1000 == 0) {
-			cout << "\nImage " << iter+1;
-			cout << ". Cost: " << cost << ". Learning rate: " << learning_rate << ". So far error: " << float(num_training_errors)/float(iter+1)*100.0 << "%. So far missed: " << num_training_errors;
 		}
 	}
 	
+	float training_percent_error = float(num_training_errors)/kTrainingImageCount * 100.0;
+	cout << "\n\nTraining error rate is: " << setw(3) << training_percent_error << "%.\n";
+	
 	//TESTING LOOP//
 	int num_testing_errors = 0;
-	float cost = 0;
-	float min_max_cost = 0;
 	vector<float> high_error_stats;
 	for(int iter = 0; iter < kTestingImageCount; iter++) {
 		float mean = Mean(testing_pixels, iter*num_nodes[0], num_nodes[0]);
@@ -244,10 +244,10 @@ int main() {
 		}
 		
 		//Find which number the networks reads input as
-		float max = -1;
-		int max_index = -1;											//Max index is the digit the network predicted (max because it's the maximum activation)
+		max = -1;
+		max_index = -1;											//Max index is the digit the network predicted (max because it's the maximum activation)
 		cost = 0;
-		float activation = -1;
+		activation = -1;
 		for(int i = 0; i < num_nodes[kLayerCount-1]; i++) {
 			activation = layers[kLayerCount-1].a_[i];
 			if(i == (int)testing_labels[iter]) {
@@ -285,7 +285,7 @@ int main() {
 	}
 	cout << "\n" << kHighErrorCount << " most difficult digits: ";
 	for(int i = 0; i < kHighErrorCount; i++) {
-		cout << "\nAt image " << high_error_stats[i*5+4] << ": Actual " << high_error_stats[i*5] << ", Predicted " << high_error_stats[i*5+1] << ", Cost " << high_error_stats[i*5+2] << ", Max Activation " << high_error_stats[i*5+3];
+		cout << "\nAt image " << setw(6) << high_error_stats[i*5+4] << ": Actual " << high_error_stats[i*5] << ", Predicted " << high_error_stats[i*5+1] << ", Cost " << setw(4) << high_error_stats[i*5+2] << ", Max Activation " << setw(4) << high_error_stats[i*5+3];
 	}
 	cout << "\nThe testing error is: " << (float(num_testing_errors)/kTestingImageCount)*100 << "%.\n";
 	cout << "\nThe end!\n";
