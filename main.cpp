@@ -27,7 +27,7 @@ const int kEpochCount = 7;
 const int kResolution = 28; 									
 const int kInputCount = kResolution*kResolution;								
 const int kTrainingImageCount = 60000;			
-const int kTestingImageCount = 10000;					
+const int kTestingImageCount = 10000;	
 
 int main() {
 	//set random seed
@@ -73,6 +73,7 @@ int main() {
 	//initialize default weights and activations for the network
 	layers[0].a_.assign(num_nodes[0],0);							//input layer doesn't get weights or biases
 	for(int i = 1; i < kLayerCount; i++) {
+		float max_magnitude = 1.0 / sqrt(num_nodes[i]);
 		layers[i].a_.assign(num_nodes[i],0);
 		for(int k = 0; k < num_nodes[i]; k++) {
 			layers[i].b_.push_back(0);
@@ -80,10 +81,18 @@ int main() {
 		for(int j = 0; j < num_nodes[i-1]; j++) {
 			vector<float> temp;
 			for(int k = 0; k < num_nodes[i]; k++) {
-				temp.push_back(RandomWeight(int(kInitialWeightMax*100.0))/float(num_nodes[i-1]));
+				temp.push_back(RandomWeight(max_magnitude));
 			}
 			layers[i].w_.push_back(temp);								//TO the ith layer
 		}
+	}
+	
+	//print weights from second to third layer
+	for(int i = 0; i < num_nodes[1]; i++) {
+		for(int j = 0; j < num_nodes[2]; j++) {
+			cout << layers[2].w_[i][j] << " ... ";
+		}
+		cout << "\n\n";
 	}
 	
 	
@@ -95,14 +104,19 @@ int main() {
 	
 	//TRAINING LOOP (slow)//
 	for(int epoch_iter = 0; epoch_iter < kEpochCount; epoch_iter++) {
-		for(int iter = 0; iter < kTrainingImageCount/kBatchSize; iter++) {
+		for(int iter = 0; iter < 10000 /*kTrainingImageCount/kBatchSize*/; iter++) {
 			float learning_rate = Schedule(iter+1);
 			float mean = Mean(training_pixels, iter*num_nodes[0], num_nodes[0]);
 			float variance = Variance(training_pixels, iter*num_nodes[0], num_nodes[0], mean);
 			
-			//Plug in normalized (mean 0 variance 1) pixel values
+			// //Plug in normalized (mean 0 variance 1) pixel values
+			// for(int i = 0; i < num_nodes[0]; i++) {
+			// 		layers[0].a_[i] = (1/sqrt(variance))*(training_pixels[iter*num_nodes[0] + i]-mean);				
+			// }
+			
+			//Plug in normalized ( range (0,1) ) pixel values
 			for(int i = 0; i < num_nodes[0]; i++) {
-				layers[0].a_[i] = (1/sqrt(variance))*(training_pixels[iter*num_nodes[0] + i]-mean);				
+				layers[0].a_[i] = training_pixels[iter*num_nodes[0] + i ] / 256.0;
 			}
 
 			//FEEDFORWARD//
@@ -171,7 +185,7 @@ int main() {
 				if(i != 0)
 					delete [] bias_gradient[i-1];
 			}
-			if(iter %15000 == 0) {
+			if(iter % 500 == 0) {
 				cout << "\n" << iter << " images complete. ";
 			}
 		}
@@ -184,11 +198,16 @@ int main() {
 		float mean = Mean(training_pixels, iter*num_nodes[0], num_nodes[0]);
 		float variance = Variance(training_pixels, iter*num_nodes[0], num_nodes[0], mean);
 		
-		//Plug in normalized pixel values
+		// //Plug in normalized pixel values
+		// for(int i = 0; i < num_nodes[0]; i++) {
+		// 	if(variance == 0)
+		// 		cout << "\t\t\t\tVARIANCE IS 0, so division by 0 occurs";
+		// 	layers[0].a_[i] = (1/sqrt(variance))*(training_pixels[iter*num_nodes[0] + i]-mean);					//mean-0, variance-1
+		// }
+		
+		//Plug in normalized ( range (0,1) ) pixel values
 		for(int i = 0; i < num_nodes[0]; i++) {
-			if(variance == 0)
-				cout << "\t\t\t\tVARIANCE IS 0, so division by 0 occurs";
-			layers[0].a_[i] = (1/sqrt(variance))*(training_pixels[iter*num_nodes[0] + i]-mean);					//mean-0, variance-1
+			layers[0].a_[i] = training_pixels[iter*num_nodes[0] + i ] / 256.0;
 		}
 		
 		//Feed into rest of network

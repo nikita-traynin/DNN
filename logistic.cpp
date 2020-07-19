@@ -45,8 +45,8 @@ float Schedule(int x) {
 	return LinearSchedule(x);
 }
 
-float RandomWeight(int max_magnitude_times_100) {
-	return float((rand()%(2*max_magnitude_times_100+1))-max_magnitude_times_100)/100.0;
+float RandomWeight(float max_magnitude) {
+	return (rand()%(int(2*max_magnitude*100.0+1)) - int(max_magnitude*100.0))/100.0;
 }
 
 float Mean(unsigned char *arr, int start, int size) {
