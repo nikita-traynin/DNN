@@ -87,32 +87,34 @@ int main() {
 		}
 	}
 	
-	//print weights from second to third layer
-	for(int i = 0; i < num_nodes[1]; i++) {
-		for(int j = 0; j < num_nodes[2]; j++) {
-			cout << layers[2].w_[i][j] << " ... ";
-		}
-		cout << "\n\n";
-	}
-	
-	
 	//Initialize variables and arrays for training
+	cout << "\n\nSup1\n\n";
 	float **activation_gradient = new float*[kLayerCount];
-	activation_gradient[kLayerCount-1] = new float[num_nodes[kLayerCount-1]];
 	float ***weight_gradient = new float**[kLayerCount-1];					//FROM the ith layer
 	float **bias_gradient = new float*[kLayerCount-1];
+	cout << "\n\nSup2\n\n";
+	for(int i = 0; i < kLayerCount; i++) {
+		cout << "\nLayerPreSup: " << i;
+		if(i != kLayerCount-1) {
+			weight_gradient[i] = new float*[num_nodes[i]];
+			cout << "weight layer, ";
+			bias_gradient[i] = new float[num_nodes[i+1]];
+			cout << "bias, ";
+			for(int j = 0; j < num_nodes[i]; j++) {
+				weight_gradient[i][j] = new float[num_nodes[i+1]];
+			}
+		}
+		activation_gradient[i] = new float[num_nodes[i]];
+		cout << ", LayerPostSup: " << i << "\n";
+	}
+	cout << "\n\nSup3\n\n";
 	
 	//TRAINING LOOP (slow)//
+	int num_training_errors = 0, max_index = -1;
+	float cost = 0, max = -1, activation = -1, min_max_cost = 0;
 	for(int epoch_iter = 0; epoch_iter < kEpochCount; epoch_iter++) {
-		for(int iter = 0; iter < 10000 /*kTrainingImageCount/kBatchSize*/; iter++) {
-			float learning_rate = Schedule(iter+1);
-			float mean = Mean(training_pixels, iter*num_nodes[0], num_nodes[0]);
-			float variance = Variance(training_pixels, iter*num_nodes[0], num_nodes[0], mean);
-			
-			// //Plug in normalized (mean 0 variance 1) pixel values
-			// for(int i = 0; i < num_nodes[0]; i++) {
-			// 		layers[0].a_[i] = (1/sqrt(variance))*(training_pixels[iter*num_nodes[0] + i]-mean);				
-			// }
+		for(int iter = 0; iter < kTrainingImageCount/kBatchSize; iter++) {
+			float learning_rate = Schedule(epoch_iter*kTrainingImageCount + iter+1);
 			
 			//Plug in normalized ( range (0,1) ) pixel values
 			for(int i = 0; i < num_nodes[0]; i++) {
@@ -136,11 +138,11 @@ int main() {
 			float diff;
 			for(int i = 0; i < num_nodes[kLayerCount-1]; i++) {
 				if(i == training_labels[iter]) {
-					activation_gradient[kLayerCount-1][i] = 2*(layers[kLayerCount-1].a_[i]-1);
+					activation_gradient[kLayerCount-1][i] = (layers[kLayerCount-1].a_[i]-1);
 					diff = layers[kLayerCount-1].a_[i]-1;
 				}
 				else {
-					activation_gradient[kLayerCount-1][i] = 2*(layers[kLayerCount-1].a_[i]);
+					activation_gradient[kLayerCount-1][i] = (layers[kLayerCount-1].a_[i]);
 					diff = layers[kLayerCount-1].a_[i];
 				}
 				cost += diff*diff;
@@ -148,11 +150,11 @@ int main() {
 			
 			//Backpropagate to find gradients for all other layers
 			for(int i = kLayerCount-2; i >= 0; i--) {
-				activation_gradient[i] = new float[num_nodes[i]];
-				weight_gradient[i] = new float*[num_nodes[i]];
-				bias_gradient[i] = new float[num_nodes[i+1]];
+				//activation_gradient[i] = new float[num_nodes[i]];
+				//weight_gradient[i] = new float*[num_nodes[i]];
+				//bias_gradient[i] = new float[num_nodes[i+1]];
 				for(int j = 0; j < num_nodes[i]; j++) {
-					weight_gradient[i][j] = new float[num_nodes[i+1]];
+					//weight_gradient[i][j] = new float[num_nodes[i+1]];
 					float sum = 0;
 					for(int k = 0; k < num_nodes[i+1]; k++) {
 						float factor = LogisticPrime(layers[i+1].a_[k]);
@@ -164,8 +166,8 @@ int main() {
 				}
 				for(int j = 0; j < num_nodes[i+1]; j++) {
 					bias_gradient[i][j] = LogisticPrime(layers[i+1].a_[j])*activation_gradient[i+1][j];
-				}
-				delete [] activation_gradient[i];
+				}  
+				//delete [] activation_gradient[i];
 			}
 			
 			//Adjust weights and biases
@@ -175,68 +177,59 @@ int main() {
 						for(int k = 0; k < num_nodes[i+1]; k++) {
 							layers[i+1].w_[j][k] -= learning_rate*weight_gradient[i][j][k];
 						}
-						delete [] weight_gradient[i][j];
+						//delete [] weight_gradient[i][j];
 					}
 					if(i != 0) {
 						layers[i].b_[j] -= learning_rate*bias_gradient[i-1][j];
 					}
 				}
-				delete [] weight_gradient[i];
-				if(i != 0)
-					delete [] bias_gradient[i-1];
+				//delete [] weight_gradient[i];
+				// if(i != 0)
+					// delete [] bias_gradient[i-1];
 			}
-			if(iter % 500 == 0) {
+			if(iter % 1500 == 0) {
 				cout << "\n" << iter << " images complete. ";
 			}
 		}
-	}
-	
-	//GET TRAINING ERROR
-	int num_training_errors = 0, max_index = -1;
-	float cost = 0, max = -1, activation = -1, min_max_cost = 0;
-	for(int iter = 0; iter < kTrainingImageCount; iter++) {
-		float mean = Mean(training_pixels, iter*num_nodes[0], num_nodes[0]);
-		float variance = Variance(training_pixels, iter*num_nodes[0], num_nodes[0], mean);
-		
-		// //Plug in normalized pixel values
-		// for(int i = 0; i < num_nodes[0]; i++) {
-		// 	if(variance == 0)
-		// 		cout << "\t\t\t\tVARIANCE IS 0, so division by 0 occurs";
-		// 	layers[0].a_[i] = (1/sqrt(variance))*(training_pixels[iter*num_nodes[0] + i]-mean);					//mean-0, variance-1
-		// }
-		
-		//Plug in normalized ( range (0,1) ) pixel values
-		for(int i = 0; i < num_nodes[0]; i++) {
-			layers[0].a_[i] = training_pixels[iter*num_nodes[0] + i ] / 256.0;
-		}
-		
-		//Feed into rest of network
-		for(int i = 1; i < kLayerCount; i++) {
-			for(int j = 0; j < num_nodes[i]; j++) {
-				float sum = 0;
-				for(int k = 0; k < num_nodes[i-1]; k++) {
-					sum += layers[i-1].a_[k] * layers[i].w_[k][j];
+		//GET TRAINING ERROR
+		num_training_errors = 0;
+		for(int iter = 0; iter < kTrainingImageCount; iter++) {
+			
+			//Plug in normalized ( range (0,1) ) pixel values
+			for(int i = 0; i < num_nodes[0]; i++) {
+				layers[0].a_[i] = training_pixels[iter*num_nodes[0] + i ] / 256.0;
+			}
+			
+			//Feed into rest of network
+			for(int i = 1; i < kLayerCount; i++) {
+				for(int j = 0; j < num_nodes[i]; j++) {
+					float sum = 0;
+					for(int k = 0; k < num_nodes[i-1]; k++) {
+						sum += layers[i-1].a_[k] * layers[i].w_[k][j];
+					}
+					sum += layers[i].b_[j];				
+					layers[i].a_[j] = Logistic(sum);			
 				}
-				sum += layers[i].b_[j];				
-				layers[i].a_[j] = Logistic(sum);			
+			}
+			
+			//Count errors
+			max = -1;
+			max_index = -1;											//Max index is the digit the network predicted (max because it's the maximum activation)
+			for(int i = 0; i < num_nodes[kLayerCount-1]; i++) {
+				activation = layers[kLayerCount-1].a_[i];
+				if(activation > max)
+					{ max_index = i; max = activation; }
+			}
+			if(max_index != training_labels[iter]) {
+				num_training_errors++;
 			}
 		}
 		
-		//Count errors
-		max = -1;
-		max_index = -1;											//Max index is the digit the network predicted (max because it's the maximum activation)
-		for(int i = 0; i < num_nodes[kLayerCount-1]; i++) {
-			activation = layers[kLayerCount-1].a_[i];
-			if(activation > max)
-				{ max_index = i; max = activation; }
-		}
-		if(max_index != training_labels[iter]) {
-			num_training_errors++;
-		}
+		float training_percent_error = float(num_training_errors)/kTrainingImageCount * 100.0;
+		cout << "\n\nValidation error rate is: " << setw(3) << training_percent_error << "%.\n";
 	}
 	
-	float training_percent_error = float(num_training_errors)/kTrainingImageCount * 100.0;
-	cout << "\n\nTraining error rate is: " << setw(3) << training_percent_error << "%.\n";
+	
 	
 	//TESTING LOOP//
 	int num_testing_errors = 0;
@@ -245,9 +238,14 @@ int main() {
 		float mean = Mean(testing_pixels, iter*num_nodes[0], num_nodes[0]);
 		float variance = Variance(testing_pixels, iter*num_nodes[0], num_nodes[0], mean);
 		
-		//Plug in normalized pixel values
+		// //Plug in normalized pixel values
+		// for(int i = 0; i < num_nodes[0]; i++) {
+		// 	layers[0].a_[i] = (1/sqrt(variance))*(testing_pixels[iter*num_nodes[0] + i]-mean);					//mean-0, variance-1
+		// }
+		
+		//Plug in normalized ( range (0,1) ) pixel values
 		for(int i = 0; i < num_nodes[0]; i++) {
-			layers[0].a_[i] = (1/sqrt(variance))*(testing_pixels[iter*num_nodes[0] + i]-mean);					//mean-0, variance-1
+			layers[0].a_[i] = training_pixels[iter*num_nodes[0] + i ] / 256.0;
 		}
 		
 		//Feed into rest of network

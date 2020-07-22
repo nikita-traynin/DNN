@@ -31,9 +31,9 @@ float ExponentialSchedule(int x) {
 }
 
 float LinearSchedule(int x) {
-	float initial_rate = 0.2;
-	int num_iterations = 500;
-	float lower_bound = 0.01;
+	float initial_rate = 0.1;
+	int num_iterations = 2000;
+	float lower_bound = 0.001;
 	if(x > num_iterations)
 		return lower_bound;
 	else
