@@ -16,12 +16,11 @@
 using namespace std;
 
 //hyperparameters
-const int kLayerCount = 3;						//>=3 (one for input, one for decision, and at least one hidden)					
-const int kNodeCount[kLayerCount-2] {50};		//>=1 			
+const int kLayerCount = 4;						//>=3 (one for input, one for decision, and at least one hidden)					
+const int kNodeCount[kLayerCount-2] {50, 25};		//>=1 			
 const int kBatchSize = 1;						//TODO: currently must be 1! Change so that different batchsizes are possible.
-const float kInitialWeightMax = 2.4;			//max magnitude of initial random weight
 const int kHighErrorCount = 10;					//how many most difficult test images to show
-const int kEpochCount = 7;
+const int kEpochCount = 3;
 
 //TODO temporary variables for input-data related info. Remove when we can read this from input file (idx1/idx3)
 const int kResolution = 28; 									
@@ -61,6 +60,24 @@ int main() {
 		testing_labels_file.read((char*)(testing_labels+i) ,1);
 	}
 	
+	
+	//Print out a number from training set
+	for(int number_i = 0; number_i < 5; number_i++) {
+		cout << "\n\n\n";
+		for(int i  = 0; i < kResolution; i++) {
+			for(int j = 0; j < kResolution; j++) {
+				int pixel = int(*(training_pixels + number_i*kInputCount + i*kResolution + j));
+				if (pixel > 0) {
+					cout << " 1 ";
+				}
+				else
+					cout << "000"; 
+			}
+			cout << "\n";
+		}
+		cout << "\n\n";
+	}
+	
 	//Initialize network objects and set the number of nodes in each layer
 	int num_nodes[kLayerCount];
 	num_nodes[0] = kInputCount;
@@ -88,26 +105,19 @@ int main() {
 	}
 	
 	//Initialize variables and arrays for training
-	cout << "\n\nSup1\n\n";
 	float **activation_gradient = new float*[kLayerCount];
 	float ***weight_gradient = new float**[kLayerCount-1];					//FROM the ith layer
 	float **bias_gradient = new float*[kLayerCount-1];
-	cout << "\n\nSup2\n\n";
 	for(int i = 0; i < kLayerCount; i++) {
-		cout << "\nLayerPreSup: " << i;
 		if(i != kLayerCount-1) {
 			weight_gradient[i] = new float*[num_nodes[i]];
-			cout << "weight layer, ";
 			bias_gradient[i] = new float[num_nodes[i+1]];
-			cout << "bias, ";
 			for(int j = 0; j < num_nodes[i]; j++) {
 				weight_gradient[i][j] = new float[num_nodes[i+1]];
 			}
 		}
 		activation_gradient[i] = new float[num_nodes[i]];
-		cout << ", LayerPostSup: " << i << "\n";
 	}
-	cout << "\n\nSup3\n\n";
 	
 	//TRAINING LOOP (slow)//
 	int num_training_errors = 0, max_index = -1;
@@ -129,7 +139,7 @@ int main() {
 						sum += layers[i-1].a_[k] * layers[i].w_[k][j];
 					}
 					sum += layers[i].b_[j];						
-					layers[i].a_[j] = Logistic(sum);			
+					layers[i].a_[j] = ReLU(sum);			
 				}
 			}
 			
@@ -150,24 +160,20 @@ int main() {
 			
 			//Backpropagate to find gradients for all other layers
 			for(int i = kLayerCount-2; i >= 0; i--) {
-				//activation_gradient[i] = new float[num_nodes[i]];
-				//weight_gradient[i] = new float*[num_nodes[i]];
-				//bias_gradient[i] = new float[num_nodes[i+1]];
 				for(int j = 0; j < num_nodes[i]; j++) {
-					//weight_gradient[i][j] = new float[num_nodes[i+1]];
 					float sum = 0;
 					for(int k = 0; k < num_nodes[i+1]; k++) {
-						float factor = LogisticPrime(layers[i+1].a_[k]);
-						weight_gradient[i][j][k] = layers[i].a_[j]*factor*activation_gradient[i+1][k];
+						//IMPORTANT: weight gradient calculation 
+						weight_gradient[i][j][k] = activation_gradient[i+1][k]*ReLUPrime(layers[i+1].a_[k])*layers[i].a_[j];
+						//Matrix multiply to get activation gradient (W_j * X_j * X_j')
 						if(i != 0)
-							sum += layers[i+1].w_[j][k]*factor*activation_gradient[i+1][k];
+							sum += layers[i+1].w_[j][k]*activation_gradient[i+1][k]*ReLUPrime(layers[i+1].a_[k]);
 					}
 					activation_gradient[i][j] = sum;
 				}
 				for(int j = 0; j < num_nodes[i+1]; j++) {
-					bias_gradient[i][j] = LogisticPrime(layers[i+1].a_[j])*activation_gradient[i+1][j];
+					bias_gradient[i][j] = ReLUPrime(layers[i+1].a_[j])*activation_gradient[i+1][j];
 				}  
-				//delete [] activation_gradient[i];
 			}
 			
 			//Adjust weights and biases
@@ -208,7 +214,7 @@ int main() {
 						sum += layers[i-1].a_[k] * layers[i].w_[k][j];
 					}
 					sum += layers[i].b_[j];				
-					layers[i].a_[j] = Logistic(sum);			
+					layers[i].a_[j] = ReLU(sum);			
 				}
 			}
 			
@@ -235,13 +241,6 @@ int main() {
 	int num_testing_errors = 0;
 	vector<float> high_error_stats;
 	for(int iter = 0; iter < kTestingImageCount; iter++) {
-		float mean = Mean(testing_pixels, iter*num_nodes[0], num_nodes[0]);
-		float variance = Variance(testing_pixels, iter*num_nodes[0], num_nodes[0], mean);
-		
-		// //Plug in normalized pixel values
-		// for(int i = 0; i < num_nodes[0]; i++) {
-		// 	layers[0].a_[i] = (1/sqrt(variance))*(testing_pixels[iter*num_nodes[0] + i]-mean);					//mean-0, variance-1
-		// }
 		
 		//Plug in normalized ( range (0,1) ) pixel values
 		for(int i = 0; i < num_nodes[0]; i++) {
@@ -256,7 +255,7 @@ int main() {
 					sum += layers[i-1].a_[k] * layers[i].w_[k][j];
 				}
 				sum += layers[i].b_[j];				
-				layers[i].a_[j] = Logistic(sum);			
+				layers[i].a_[j] = ReLU(sum);			
 			}
 		}
 		

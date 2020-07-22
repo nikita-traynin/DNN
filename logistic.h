@@ -7,6 +7,7 @@
 float Logistic(float x);
 float LogisticPrime(float x);
 float ReLU(float x);
+float ReLUPrime(float ReLUresult);
 float Schedule(int x);
 float ExponentialSchedule(int x);
 float LinearSchedule(int x);

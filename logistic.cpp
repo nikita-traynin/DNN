@@ -20,6 +20,10 @@ float ReLU(float x) {
 		return x;
 }
 
+float ReLUPrime(float ReLUresult) {
+	return ReLUresult;
+}
+
 float ExponentialSchedule(int x) {
 	float multiplier = 5;
 	float decay_scaling = 29;													//the higher, the slower learning rate decays
@@ -31,9 +35,9 @@ float ExponentialSchedule(int x) {
 }
 
 float LinearSchedule(int x) {
-	float initial_rate = 0.1;
-	int num_iterations = 2000;
-	float lower_bound = 0.001;
+	float initial_rate = 0.075;
+	int num_iterations = 120000;
+	float lower_bound = 0.01;
 	if(x > num_iterations)
 		return lower_bound;
 	else
