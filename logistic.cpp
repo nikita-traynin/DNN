@@ -1,5 +1,6 @@
 #include <cmath>
 #include <vector>
+#include <iostream>
 
 using namespace std;
 
@@ -21,7 +22,11 @@ float ReLU(float x) {
 }
 
 float ReLUPrime(float ReLUresult) {
-	return ReLUresult;
+	if (ReLUresult > 0) {
+		return 1;
+	}
+	else
+		return 0;
 }
 
 float ExponentialSchedule(int x) {
@@ -35,9 +40,9 @@ float ExponentialSchedule(int x) {
 }
 
 float LinearSchedule(int x) {
-	float initial_rate = 0.075;
-	int num_iterations = 120000;
-	float lower_bound = 0.01;
+	float initial_rate = 0.1;
+	int num_iterations = 10;
+	float lower_bound = 0.1;
 	if(x > num_iterations)
 		return lower_bound;
 	else
@@ -49,26 +54,8 @@ float Schedule(int x) {
 	return LinearSchedule(x);
 }
 
-float RandomWeight(float max_magnitude) {
+float SymmetricUniform(float max_magnitude) {
 	return (rand()%(int(2*max_magnitude*100.0+1)) - int(max_magnitude*100.0))/100.0;
-}
-
-float Mean(unsigned char *arr, int start, int size) {
-	float mean = 0;
-	for(int i = 0; i < size; i++) {
-		mean += arr[start+i];
-	}
-	return mean/size;
-}
-
-float Variance(unsigned char *arr, int start, int size, float mean) {
-	float variance = 0;
-	float diff;
-	for(int i = 0; i < size; i++) {
-		diff = arr[start+i]-mean;
-		variance += diff*diff;
-	}
-	return variance/size;
 }
 
 int MinimumCostIndex(vector<float> &vec) {
@@ -81,4 +68,23 @@ int MinimumCostIndex(vector<float> &vec) {
 		}
 	}
 	return index;
+}
+
+void PrintNumbers(unsigned char* pixels, int resolution, int start, int end) {
+	for(int image_count = start; image_count < end; image_count++) {
+		cout << "\n\n";
+		for(int i = 0; i < resolution; i++) {
+			for(int j = 0; j < resolution; j++) {
+				int pixel = int(*(pixels + image_count*resolution*resolution + i*resolution + j));
+				if (pixel > 0) {
+					cout << " 1 ";
+				}
+				else {
+					cout << "000";
+				}
+			}
+			cout << "\n";
+		}
+	}
+	return;
 }
